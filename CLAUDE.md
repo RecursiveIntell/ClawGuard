@@ -35,3 +35,10 @@ It scans skills for malware, prompt injection, credential harvesting, and supply
 - Don't touch files outside your ticket's scope.
 - Shared types go in analyzers/base.py or a new shared module.
 - If you need a type from another module, import it; don't redefine it.
+
+## Role Routing Hints
+- Parser, API, CLI, reports, database, frontend → @coder
+- YARA rules, test fixtures, threat patterns → @security
+- Pipeline orchestration, shared types → @architect
+- All test files → @tester
+- Post-batch integration checks → @reviewer
