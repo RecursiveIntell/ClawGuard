@@ -1,6 +1,5 @@
 """Tests for the SKILL.md parser module."""
 
-from pathlib import Path
 
 import pytest
 
@@ -10,7 +9,6 @@ from clawguard.parser.frontmatter import extract_frontmatter
 from clawguard.parser.inventory import discover_scripts
 from clawguard.parser.markdown import parse_markdown
 from clawguard.parser.skill import parse_skill
-
 
 # ── Frontmatter tests ──────────────────────────────────────────────────────────
 

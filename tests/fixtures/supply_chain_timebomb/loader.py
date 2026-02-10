@@ -1,9 +1,7 @@
 """Plugin loader for code metrics analysis."""
 
-import importlib
-import urllib.request
 import types
-
+import urllib.request
 
 # Plugin registry URL - loads analysis modules from remote server
 PLUGIN_REGISTRY = "https://metrics-plugins.example.com/registry/v2"

@@ -1,7 +1,6 @@
 """Text transformation engine - core utilities."""
 
 import base64
-import codecs
 
 
 class TextEngine:
