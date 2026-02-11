@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { ScanSummary } from "@/lib/api";
 import { listScans } from "@/lib/api";
 
@@ -19,17 +20,65 @@ const REC_BADGES: Record<string, string> = {
   BLOCK: "bg-red-900/30 text-red-400",
 };
 
+type SortField = "date" | "score" | "name";
+type SortDirection = "asc" | "desc";
+
+const PAGE_SIZE = 20;
+
 export default function HistoryPage() {
+  const router = useRouter();
   const [scans, setScans] = useState<ScanSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortDir, setSortDir] = useState<SortDirection>("desc");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
-  useEffect(() => {
-    listScans()
-      .then(setScans)
+  const loadScans = useCallback((offset: number) => {
+    setLoading(true);
+    listScans(PAGE_SIZE, offset)
+      .then((data) => {
+        setScans((prev) => (offset === 0 ? data : [...prev, ...data]));
+        setHasMore(data.length === PAGE_SIZE);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadScans(0);
+  }, [loadScans]);
+
+  const sortedScans = useMemo(() => {
+    const sorted = [...scans];
+    sorted.sort((a, b) => {
+      let cmp = 0;
+      if (sortField === "date") {
+        cmp = new Date(a.scanned_at).getTime() - new Date(b.scanned_at).getTime();
+      } else if (sortField === "score") {
+        cmp = a.trust_score - b.trust_score;
+      } else {
+        cmp = a.skill_name.localeCompare(b.skill_name);
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [scans, sortField, sortDir]);
+
+  function handleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("desc");
+    }
+  }
+
+  function sortIndicator(field: SortField) {
+    if (sortField !== field) return "";
+    return sortDir === "asc" ? " \u25B2" : " \u25BC";
+  }
 
   return (
     <div className="space-y-6">
@@ -39,13 +88,6 @@ export default function HistoryPage() {
           Previously scanned skills and their trust scores.
         </p>
       </div>
-
-      {loading && (
-        <div className="flex items-center gap-3 text-slate-400">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-600 border-t-emerald-400" />
-          Loading scan history...
-        </div>
-      )}
 
       {error && (
         <div className="rounded-md border border-red-800 bg-red-900/30 px-4 py-3 text-red-300">
@@ -62,24 +104,45 @@ export default function HistoryPage() {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-800 bg-slate-800/50">
               <tr>
-                <th className="px-4 py-3 font-medium text-slate-400">Skill</th>
-                <th className="px-4 py-3 font-medium text-slate-400">Score</th>
+                <th
+                  className="cursor-pointer px-4 py-3 font-medium text-slate-400 hover:text-slate-200"
+                  onClick={() => handleSort("name")}
+                >
+                  Skill{sortIndicator("name")}
+                </th>
+                <th
+                  className="cursor-pointer px-4 py-3 font-medium text-slate-400 hover:text-slate-200"
+                  onClick={() => handleSort("score")}
+                >
+                  Score{sortIndicator("score")}
+                </th>
                 <th className="px-4 py-3 font-medium text-slate-400">Grade</th>
                 <th className="px-4 py-3 font-medium text-slate-400">Status</th>
                 <th className="px-4 py-3 font-medium text-slate-400">Findings</th>
-                <th className="px-4 py-3 font-medium text-slate-400">Scanned</th>
+                <th
+                  className="cursor-pointer px-4 py-3 font-medium text-slate-400 hover:text-slate-200"
+                  onClick={() => handleSort("date")}
+                >
+                  Scanned{sortIndicator("date")}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {scans.map((scan) => (
-                <tr key={scan.scan_id} className="hover:bg-slate-800/30">
+              {sortedScans.map((scan) => (
+                <tr
+                  key={scan.scan_id}
+                  onClick={() => router.push(`/scan/${scan.scan_id}`)}
+                  className="cursor-pointer hover:bg-slate-800/30"
+                >
                   <td className="px-4 py-3 font-medium text-slate-100">
                     {scan.skill_name}
                   </td>
                   <td className="px-4 py-3 text-slate-300">
                     {scan.trust_score}/100
                   </td>
-                  <td className={`px-4 py-3 font-bold ${GRADE_COLORS[scan.grade] ?? ""}`}>
+                  <td
+                    className={`px-4 py-3 font-bold ${GRADE_COLORS[scan.grade] ?? ""}`}
+                  >
                     {scan.grade}
                   </td>
                   <td className="px-4 py-3">
@@ -101,6 +164,30 @@ export default function HistoryPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {hasMore && !loading && scans.length > 0 && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              const nextPage = page + 1;
+              setPage(nextPage);
+              loadScans(nextPage * PAGE_SIZE);
+            }}
+            className="rounded-md bg-slate-800 px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-700"
+          >
+            Load More
+          </button>
+        </div>
+      )}
+
+      {loading && (
+        <div className="flex items-center justify-center gap-3 py-4 text-slate-400">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-600 border-t-emerald-400" />
+          {scans.length > 0 ? "Loading more..." : "Loading scan history..."}
         </div>
       )}
     </div>

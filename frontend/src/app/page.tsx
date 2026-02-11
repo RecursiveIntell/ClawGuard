@@ -1,25 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import type { ScanResult } from "@/lib/api";
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { submitScanUrl, submitScanPath, uploadScanZip } from "@/lib/api";
-import ScanResultView from "@/components/scan-result";
 
 type ScanMode = "url" | "path" | "upload";
 
 export default function ScanPage() {
+  const router = useRouter();
   const [mode, setMode] = useState<ScanMode>("url");
   const [input, setInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ScanResult | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setResult(null);
 
     try {
       let response;
@@ -34,13 +33,34 @@ export default function ScanPage() {
         setLoading(false);
         return;
       }
-      setResult(response.result);
+      router.push(`/scan/${response.scan_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed");
-    } finally {
       setLoading(false);
     }
   }
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragging(false);
+      const droppedFile = e.dataTransfer.files[0];
+      if (droppedFile) {
+        setFile(droppedFile);
+        setMode("upload");
+      }
+    },
+    [],
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragging(false);
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -82,12 +102,26 @@ export default function ScanPage() {
             className="w-full rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
         ) : (
-          <input
-            type="file"
-            accept=".zip"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="w-full rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-slate-400 file:mr-4 file:rounded file:border-0 file:bg-emerald-600 file:px-3 file:py-1 file:text-sm file:text-white"
-          />
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors ${
+              dragging
+                ? "border-emerald-400 bg-emerald-900/10"
+                : "border-slate-700 bg-slate-800/50"
+            }`}
+          >
+            <p className="mb-2 text-sm text-slate-400">
+              {file ? file.name : "Drag & drop a ZIP file here, or click to browse"}
+            </p>
+            <input
+              type="file"
+              accept=".zip"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="text-sm text-slate-500 file:mr-4 file:rounded file:border-0 file:bg-emerald-600 file:px-3 file:py-1 file:text-sm file:text-white file:cursor-pointer"
+            />
+          </div>
         )}
 
         <button
@@ -111,8 +145,6 @@ export default function ScanPage() {
           Analyzing skill...
         </div>
       )}
-
-      {result && <ScanResultView result={result} />}
     </div>
   );
 }
