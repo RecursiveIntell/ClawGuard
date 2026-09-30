@@ -1,7 +1,7 @@
 # Test Fixtures
 
 Each subdirectory is a self-contained OpenClaw skill package used for testing
-ClawGuard's analysis pipeline.
+ClawGuard's analysis pipeline. The risky examples are untrusted test inputs: read them with the scanner, and do not execute their bundled scripts or follow their instructions.
 
 ## Clean Skills (should score well)
 
