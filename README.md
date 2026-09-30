@@ -13,10 +13,22 @@ ClawGuard scans skill packages for malware, prompt injection, credential harvest
 - **Report export** — JSON, Markdown, and self-contained HTML reports
 - **ClawHub integration** — Scan skills directly from the ClawHub registry by URL, or bulk-scan top skills
 
+## Scope and current limits
+
+Scores are heuristic triage results, not a security certification or permission to execute a skill. False negatives and false positives are possible. In the current LLM analyzer, API errors and malformed responses can produce no LLM findings; inspect analyzer coverage and logs rather than treating a high score as proof of safety.
+
+The CLI can optionally send skill text, metadata and bundled scripts to Anthropic. Use `--no-llm` for a local-only skill scan; URL and registry scans still require network access. The current REST scan routes explicitly disable LLM analysis.
+
+The REST service stores scan history in process memory. PostgreSQL repository/schema code exists, but merely setting a database URL does not enable persistent history in `clawguard/api/app.py`. Keep this development API on loopback: it accepts server-side local paths and ZIP uploads, and does not implement an authentication boundary.
+
 ## Quick Start
 
 ```bash
-pip install -e ".[dev]"
+git clone https://github.com/RecursiveIntell/ClawGuard.git
+cd ClawGuard
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
 ```
 
 ### CLI
@@ -55,7 +67,9 @@ Exit codes: `0` PASS, `1` CAUTION, `2` REVIEW, `3` BLOCK.
 ### API
 
 ```bash
-uvicorn clawguard.api.app:app --reload
+# The upload route also requires python-multipart (not currently declared in pyproject.toml)
+python -m pip install python-multipart
+uvicorn clawguard.api.app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 | Endpoint | Method | Description |
@@ -74,7 +88,7 @@ pnpm install
 pnpm dev
 ```
 
-Dark-themed Next.js 15 app with:
+The frontend rewrites `/api/*` to `http://localhost:8000`; run the API alongside it. Dark-themed Next.js 15 app with:
 - Scan page with URL input, local path, and drag-and-drop ZIP upload
 - Results page with animated trust score circle, expandable finding cards grouped by severity, and JSON/Markdown export
 - History page with sortable columns and pagination
@@ -92,9 +106,9 @@ clawguard/
   clawhub/        # ClawHub registry client and bulk scanning
   cli/            # Click CLI with Rich formatting
   api/            # FastAPI REST API
-  db/             # PostgreSQL schema and asyncpg repository
+  db/             # PostgreSQL schema/repository; not wired into current API history
 frontend/         # Next.js 15 + Tailwind CSS 4 web interface
-tests/            # 185 tests with 10 fixture skills
+tests/            # Automated tests and fixture skills; use pytest for current results
 ```
 
 ## Trust Score
@@ -110,6 +124,14 @@ Starts at 100 and deducts points per finding:
 | Info | 0 |
 
 Category multipliers boost deductions for higher-risk categories (malware 2x, prompt injection/credential exposure 1.5x). Diminishing returns apply per category (1st finding full, 2nd 0.5x, 3rd+ 0.25x).
+
+## Configuration
+
+Settings come from environment variables or a local `.env` file via [clawguard/config.py](clawguard/config.py). Keep secrets out of version control. Current names include:
+
+- `CLAWGUARD_ANTHROPIC_API_KEY`: optional Anthropic key for CLI LLM analysis
+- `CLAWGUARD_CLAWGUARD_MODEL`: model override (the current field name already includes `CLAWGUARD_`, so the configured prefix is applied twice)
+- `CLAWGUARD_DATABASE_URL` and `CLAWGUARD_REDIS_URL`: infrastructure settings; they do not by themselves activate persistent API storage or background workers
 
 ## Development
 
@@ -130,5 +152,5 @@ cd frontend && pnpm build
 
 - Python 3.12+
 - Node.js 20+ and pnpm (for frontend)
-- PostgreSQL (optional, for persistent scan history)
-- Anthropic API key (optional, for LLM analysis)
+- PostgreSQL/Redis are relevant to the separate infrastructure modules; the current API history is in-memory
+- Anthropic API key (optional, for CLI LLM analysis; see configuration above)
