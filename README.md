@@ -71,7 +71,7 @@ clawguard bulk-scan --limit 50
 | `scan` | `--url URL` | Fetch a skill from ClawHub; requires network access. |
 | `scan` | `--json` | Print JSON instead of formatted text. |
 | `scan`, `scan-all`, `watch` | `--no-llm` | Skip LLM analysis. |
-| `scan` | `-o, --output PATH` | Write the report to a file; default is standard output. |
+| `scan` | `-o, --output PATH` | Write the report to a file. Without this option, formatted reports go to standard error; `--json` and `--quiet` output goes to standard output. |
 | `scan` | `-v, --verbose` | Include finding evidence in the text report when available. |
 | `scan`, `scan-all` | `-q, --quiet` | Print only the score and recommendation (and skill name for `scan-all`). |
 | `scan-all` | `--json` | Print results as a JSON array. |
