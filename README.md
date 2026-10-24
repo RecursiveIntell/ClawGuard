@@ -1,5 +1,7 @@
 # ClawGuard
 
+<!-- last-verified: 2026-10-23 -->
+
 Security analysis platform for AI agent skills (OpenClaw SKILL.md format).
 
 ClawGuard scans skill packages for malware, prompt injection, credential harvesting, social engineering, obfuscation, and supply chain risks using static analysis, AST inspection, YARA pattern matching, and LLM-powered semantic review.
@@ -58,11 +60,25 @@ clawguard scan path/to/skill/ --output report.md
 # Watch mode — re-scan on file changes
 clawguard watch path/to/skill/
 
-# Bulk-scan top ClawHub skills
+# Bulk-scan top ClawHub skills (network access required; default limit is 100)
 clawguard bulk-scan --limit 50
 ```
 
-Exit codes: `0` PASS, `1` CAUTION, `2` REVIEW, `3` BLOCK.
+`clawguard --help` and `clawguard <command> --help` show the full command help; `clawguard --version` prints the installed version. The CLI options relevant to these workflows are:
+
+| Command | Option | Behavior and default |
+|---|---|---|
+| `scan` | `--url URL` | Fetch a skill from ClawHub; requires network access. |
+| `scan` | `--json` | Print JSON instead of formatted text. |
+| `scan`, `scan-all`, `watch` | `--no-llm` | Skip LLM analysis. |
+| `scan` | `-o, --output PATH` | Write the report to a file. Without this option, formatted reports go to standard error; `--json` and `--quiet` output goes to standard output. |
+| `scan` | `-v, --verbose` | Include finding evidence in the text report when available. |
+| `scan`, `scan-all` | `-q, --quiet` | Print only the score and recommendation (and skill name for `scan-all`). |
+| `scan-all` | `--json` | Print results as a JSON array. |
+| `bulk-scan` | `--limit N` | Number of registry skills to scan; default: `100`. |
+| `bulk-scan` | `--json` | Print results as JSON. |
+
+For `scan` and `scan-all`, exit codes are: `0` PASS, `1` CAUTION, `2` REVIEW, `3` BLOCK. `watch` and `bulk-scan` do not use these recommendation-based exit codes.
 
 ### API
 
@@ -127,11 +143,24 @@ Category multipliers boost deductions for higher-risk categories (malware 2x, pr
 
 ## Configuration
 
-Settings come from environment variables or a local `.env` file via [clawguard/config.py](clawguard/config.py). Keep secrets out of version control. Current names include:
+Environment variables and a local `.env` file are read by [clawguard/config.py](clawguard/config.py). Keep secrets out of version control; `.env` files are ignored by `.gitignore`. For CLI LLM analysis, create an API key in the [Claude Console](https://platform.claude.com/settings/keys) (Anthropic API keys commonly begin `sk-ant-…`). Supply it through a local secret manager where available, or use either shell form below with a placeholder—not a real key:
 
-- `CLAWGUARD_ANTHROPIC_API_KEY`: optional Anthropic key for CLI LLM analysis
-- `CLAWGUARD_CLAWGUARD_MODEL`: model override (the current field name already includes `CLAWGUARD_`, so the configured prefix is applied twice)
-- `CLAWGUARD_DATABASE_URL` and `CLAWGUARD_REDIS_URL`: infrastructure settings; they do not by themselves activate persistent API storage or background workers
+```bash
+export CLAWGUARD_ANTHROPIC_API_KEY="YOUR_ANTHROPIC_API_KEY"
+# Or set it for one command:
+CLAWGUARD_ANTHROPIC_API_KEY="YOUR_ANTHROPIC_API_KEY" clawguard scan path/to/skill/
+```
+
+The CLI sends skill text, metadata, and bundled scripts to Anthropic when LLM analysis is enabled; API usage may incur provider charges. Avoid putting real keys in shell history; never commit them.
+
+| Environment variable | Default | Current effect |
+|---|---|---|
+| `CLAWGUARD_ANTHROPIC_API_KEY` | unset | Enables the CLI's optional Anthropic analysis. |
+| `CLAWGUARD_CLAWGUARD_MODEL` | `claude-sonnet-4-5-20250929` | Selects the model; the field name already includes `CLAWGUARD_`, so the configured prefix appears twice. |
+| `CLAWGUARD_MAX_SKILL_SIZE_MB` | `10` | Maximum size per bundled file read for analysis; larger files are skipped. |
+| `CLAWGUARD_DATABASE_URL` | `postgresql://localhost:5432/clawguard` | Used by the separate database repository; setting it does not enable persistent API history. |
+| `CLAWGUARD_REDIS_URL` | `redis://localhost:6379/0` | Declared configuration only; no active worker/queue integration currently consumes it. |
+| `CLAWGUARD_LOG_LEVEL` | `INFO` | Declared setting, but the current CLI logging configuration does not apply it. |
 
 ## Development
 
